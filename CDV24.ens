@@ -1,0 +1,836 @@
+;AUTOR: Eduardo Miralles Ciordia
+
+
+	
+;MACROS para facilitar el codigo en las subrutinas
+LOAD:	MACRO(ra,eti)
+      	LEA(ra, eti)
+      	ld ra, ra, r0
+      	ENDMACRO
+			
+PUSH:   MACRO  (reg)
+        subu   r30, r30, 4
+        st     reg, r30, r0
+        ENDMACRO
+
+POP:    MACRO  (reg)
+        ld     reg, r30, r0
+        addu   r30, r30, 4
+        ENDMACRO
+		
+LEA:     MACRO  (reg, ETIQ)
+         or     reg, r0,  low(ETIQ)
+         or.u   reg, reg, high(ETIQ)
+         ENDMACRO
+		 
+		 
+		 		 
+;Zona de pruebas para comprobar el funcionamiento correcto del programa. Se incluyen todas las pruebas distintas realizadas. El output
+;correcto de cada prueba está incluida en la memoria del proyecto
+
+;Cadenas para las pruebas LongCad, BuscaCar y CoincidenCad
+;	org 0x10000
+;		PC1: 	data "12345678912345678922\0"
+;		PC2: 	data "longituddeunacadenademasiadolargayquenoparadeseraunmaslargaporquesilongitudcadenalarga\0"
+;		PC3: 	data "\0"	
+;		PC4: 	data "otrotextolongmedia93\0"
+;		PC5: 	data "textoextremadamentelargorepetido12345textoextremadamentelargorepetido12345textoextremadamentelargorepetido12345\0"
+;		PC6:	data "otrotextoaestudiarotrootro3425069234\0"
+;		PC7:	data "pucalargaaunmas11\0"
+;		PC8:	data "pucalargaaunmas1\0"
+
+;Zona comprimida para pruebas Comprime y Descomprime
+	org 0x12100
+	cmprdo: data 0
+	
+;Cadenas para las pruebas de Comprime y Verifica. 
+		org 0x12000
+		texto1: data "tres tristes tigres comen trigo en un trigal, el primer tigre que...\0"
+;		texto2: data "0123456789\0"
+;		texto3: data "textoextremadamentelargorepetido12345textoextremadamentelargorepetido12345textoextremadamentelargorepetido12345\0"
+;		texto4: data "\0"
+;		texto5:	data "pucalargaaunmas11\0"
+
+
+;Textos comprimidos para las pruebas de Descomprime.
+;	org 0x12000
+;	texto1: data 0x0b010044, 0x10102400, 0x74004000, 0x20736572
+;			data 0x73697274, 0x04000274, 0x00016769, 0x6d6f6304
+;			data 0x00046e65, 0x206f6704, 0x75206e65, 0x61060018
+;			data 0x65202c6c, 0x7270206c, 0x72656d69, 0x2006000c
+;			data 0x2e657571, 0x00002e2e
+
+;	texto2: data 0x07010014, 0x30000000, 0x34333231, 0x38373635
+;			data 0x37383939, 0x33343536, 0x00303132
+			
+;	texto3: data 0x6F000109, 0x00000000, 0x04746578, 0x746F6578
+;			data 0x7472656D, 0x6164616D, 0x656E7465, 0x6C617267
+;			data 0x6F726570, 0x65746964, 0x6F313233, 0x34350000
+;			data 0x4A000000, 0x00000000, 0x00000000, 0x00000000
+
+;	texto4: data 0x00000000, 0x00000000, 0x00000000, 0x00000000
+
+;	texto5: data 0x11000107, 0x00000070, 0x7563616C, 0x61726761
+;			data 0x61756E6D, 0x61733131, 0x00000000, 0x00000000
+
+
+;Zona para las pruebas. En la carga de variables de subrutinas (como "from" y "to" en BuscaCar) hay un comentario que indica dicha carga.
+;Esta variación de variables permite realizar pruebas distintas sobre la misma cadena, realizando pruebas más precisas para una mejor depuración.
+
+;PRUEBAS LongCad
+;	org 0x00000
+;	PPAL: 	LEA(r30,0x14FFC)
+;			LEA(r11,PC3) ;INTRODUCCIÓN CADENA
+;			PUSH(r11)
+;			bsr LongCad ;LLAMADA A LONGCAD
+;
+;			ret:	POP(r11)
+;			stop
+
+
+;PRUEBA BuscaCar
+;	org 0x00000
+;	PPAL:	LEA(r30,0x14FF0)
+;			or r11,r0,0x6C ;VARIABLE "C"
+;			LEA (r10,PC2) ;INTRODUCCIÓN CADENA
+;			or r12,r0,4 ;VARIABLE "FROM"
+;			or r13,r0,25 ;VARIABLE "TO"
+;			PUSH(r13) 
+;			PUSH(r12) 
+;			PUSH(r10) 
+;			PUSH(r11) 
+;			bsr BuscaCar ;LLAMADA A BUSCACAR
+;			ret:	POP(r11)
+;					POP(r10)
+;					POP(r12)
+;					POP(r13)	
+;			stop
+			
+			
+;PRUEBA CoincidenCad
+;	org 0x00000	
+;	PPAL:	LEA(r30,0x14FF8)
+;			LEA(r10,PC7) ;INTRODUCCIÓN PRIMERA CADENA
+;			LEA(r11,PC8) ;INTRODUCCIÓN SEGUNDA CADENA
+;			PUSH(r11) 
+;			PUSH(r10)
+;			bsr CoincidenCad ;LLAMADA COINCIDENCAD
+;			POP(r10)
+;			POP(r11)
+;			ret: 	POP(r11)
+;					POP(r10)
+;			stop
+			
+			
+;PRUEBA Comprime	
+	org 0x00000
+ 	PPAL: 	LEA(r30,0x14FF8	)
+ 			LEA(r28,texto1) ;INTRODUCCIÓN CADENA
+ 			LEA(r27,cmprdo) ;PUNTERO ZONA COMPRIMIDA
+ 			PUSH(r27)
+ 			PUSH(r28)
+ 			bsr Comprime ;LLAMADA COMPRIME
+ 			ret:	POP(r28)
+ 					POP(r27)
+ 			stop
+
+
+;PRUEBA Descomprime
+;	org 0x00000
+;	PPAL:	LEA(r30,0x14FF8)
+;			LEA(r12,cmprdo) ;PUNTERO ZONA COMPRIMIDA
+;			LEA(r13,texto1) ;INTRODUCCIÓN CADENA
+;			PUSH(r12)
+;			PUSH(r13)
+;			bsr Descomprime ;LLAMADA DESCOMPRIME
+;			ret:	POP(r13)
+;					POP(r12)
+; 			stop
+
+
+;PRUEBA Verifica
+;
+;	;Reserva espacio para longitud texto original
+;	org 0x12200
+;	INFO1: data 0
+;
+;	;Reserva espacio para longitud tras descomprimir
+;	org 0x12400
+;	INFO2: data 0
+;		
+;	org 0x00000
+;	PPAL: LEA(r30, 0x14FF4)
+;		LEA(r28, texto1) ;INTRODUCCIÓN CADENA
+;		LEA(r27, INFO1) ;LONGITUD TEXTO ORIGINAL
+;		LEA(r26, INFO2) ;LONGITUD TEXTO TRAS DESCOMPRIMIR
+;		PUSH(r26)
+;		PUSH(r27)
+;		PUSH(r28)
+;		bsr Verifica ;LLAMADA A VERIFICA
+;		ret: 	POP(r28)
+;				POP(r27)
+;				POP(r26)
+;		stop
+		
+
+
+
+;SUBRUTINAS PROGRAMA PRINCIPAL
+org 0x00400 ;Reserva espacio para subrutinas
+
+
+LongCad:		ld r2,r30,0 ;Puntero de la cadena
+				or r4,r0,0 ;Contador
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para el contador
+			
+	BUCLC:		ld.b r3,r2,0 ;Caracter de la cadena
+				cmp r10,r3,0 ;Caracter == 0
+				bb1 ne,r10,CONTLC ;Si no son iguales,subrutina continua
+				
+				or r29,r0,0 ;Limpia r29
+				add r29,r4,r0 ;Introduce contador en r29
+				jmp(r1)
+	
+	CONTLC:		add r4,r4,r27 ;Incrementa 1 el contador
+				add r2,r2,r27 ;Apunta al siguiente caracter
+				br BUCLC ;Salto al bucle
+				
+				
+				
+BuscaCar:		ld.b r2,r30,0 ;C
+				ld r3,r30,4 ;ref
+				ld r29,r30,8 ;from
+				ld r5,r30,12 ;to
+				or r27,r0,0 ;Limpia r27
+				add r27,r0,1 ;Valor para contador
+
+	BUCBC:		cmp r10,r29,r5 ;FROM == TO
+				bb1 ne,r10,BCCONT1 ;Si NO son iguales, sigue buscando carácter
+				
+				jmp(r1)
+				
+	BCCONT1:	ld.b r6,r3,r29 ;ref[from]
+				cmp r10,r6,r0 ;ref[from] == 0
+				bb1 ne,r10,BCCONT2 ;Si no son iguales, continua
+				
+				or r29,r0,0 ;Limpia r29
+				add r29,r5,0 ;Introduce to en r29
+				jmp(r1)
+				
+	BCCONT2:	cmp r10,r6,r2 ;ref[from] == C
+				bb1 ne,r10,BCCONT3 ;Se no se encuentra caracter, continua
+				
+				jmp(r1)
+				
+	BCCONT3:	or r8,r8,r0 ;Limpia r8
+				add r8,r29,r0 ;Carga ref[from] en r8
+				add r8,r8,r27 ;from = from + 1
+				or r29,r0,r0 ;Limpia r29
+				add r29,r8,r0 ;Guarda from actualizado en r29
+				br BUCBC
+	
+	
+	
+CoincidenCad:	ld r2,r30,0 ;Puntero Cad1
+				ld r3,r30,4 ;Puntero Cad2
+				or r7,r0,0 ;Contador=0
+				or r27,r0,0 ;Limpia r27
+				add r27,r0,1 ;Valor para los contadores y punteros
+					
+	BUCCC:		ld.b r5,r2,0 ;cad1[contador]
+				cmp r10,r5,0 ;cad1[contador]==0
+				bb1 ne,r10,CCCONT1 ;Si no son iguales, la subrutina continua
+				
+				or r29,r0,0 ;Limpia r29
+				add r29,r7,r0 ;Introduce contador en r29
+				jmp(r1)
+		
+	CCCONT1:	ld.b r6,r3,0 ;cad2[contador]
+				cmp r10,r6,0 ;cad2[contador]==0
+				bb1 ne,r10,CCCONT2 ;Si no son iguales, la subrutina continua
+				
+				or r29,r0,0 ;Limpia r29
+				or r29,r7,r0 ;Introduce contador en r29
+				jmp(r1)
+				
+	CCCONT2:	cmp r10,r5,r6 ;cad1[contador]==cad2[contador]
+				bb1 eq,r10,CCCONT3 ;Si son iguales, la subrutina continua
+				
+				or r29,r0,0 ;Limpia r29
+				or r29,r7,r0 ;Introduce contador en r29
+				jmp(r1)
+				
+	CCCONT3:	add r7,r7,r27 ;contador + 1
+				add r2,r2,r27 ;Puntero Cad1 + 1 
+				add r3,r3,r27 ;Puntero Cad2 + 1
+				br BUCCC
+				
+				
+				
+Comprime:		PUSH(r1)
+				PUSH(r31)
+				or r31,r30,0 
+				ld r2,r31,8 ;Texto
+				
+				PUSH(r2) ;Carga texto en pila
+				bsr LongCad
+				POP(r2)
+				
+				or r28,r0,0 ;Limpieza r28
+				or r28,r29,r0 ;Mete longitud de texto en r28
+				or r29,r0,0 ;Limpieza r29
+				or r27,r0,0 ;Limpieza r27
+				add r27,r0,1 ;Valor para contadores
+				divu r28, r28, 4 ;Longitud texto / 4
+				add r28, r28, 1 ;(Longitud texto / 4) + 1
+				mulu r28, r28, 4 ;((Longitud texto / 4) + 1) * 4 -----> Longitud texto está ya en módulo 4
+				add r28,r28,64 ;Añade 16 palabras al espacio a crear en marco
+				sub r30,r30,r28 ;Crea hueco en marco (en el peor de los casos, el texto no se puede comprimir)
+				or r3,r0,0	;offset texto
+				or r4,r0,0	;offset MB
+				or r5,r0,0	;offset VL
+				or r6,r0,0 ;Limpieza r6
+				add r6,r0,7 ;bit Byte MB
+				or r7,r0,0 ;Byte local MB
+				or r8,r30,0 ;puntero VL
+				ld r2,r31,8 ;Texto
+				or r9,r0,8 ;contador 8 primeros caracteres
+				
+	CBUC8:		cmp r10,r9,0 ;Contador == 0
+				bb0 eq,r10,BUCC8 ;Si no, vuelve a bucle
+				br RECORC
+	
+	BUCC8:		ld.b r11,r2,r3 ;Carácter texto
+				st.b r11,r8,r5 ;Guarda en offset VL
+				add r3,r3,r27 ;offset texto + 1
+				add r5,r5,r27 ;offset VL + 1
+				sub r9,r9,r27;Contador - 1
+				br CBUC8
+	
+	RECORCC:	sub r6,r6,r27 ;bit Byte MB - 1
+		
+	RECORC:		or r26,r0,0 ;Limpia r26
+				add r26,r26,7 ;Indica en que bit estamos
+				ld.b r11,r2,r3 ;Carácter texto
+				cmp	r10,r11,0 ;Caracter == NULL,
+				bb1 ne,r10,CONTC4 ;Si no, no terminado y continua
+				
+				cmp	r10,r6,7 ;bit Byte MB == 7				
+				bb1	ne,r10,CONTC3 ;Si no, no ha terminado de copiar y continua
+				br GUARDCB ;Ha terminado de copiar, continua para finalizar
+	
+	CONTC4:		st r3,r31,-4 ;Carga offset texto en pila
+				st r4,r31,-8 ;Carga offset MB en pila
+				st r5,r31,-12 ;Carga offset VL en pila
+				st r6,r31,-20 ;Carga bit Byte MB en pila
+				st r7,r31,-24 ;Carga Byte local MB en pila
+				sub r12,r31,16 ;Dirección jj
+				
+				PUSH(r12) ;Carga jj en pila
+				PUSH(r3) ;Carga Posicion en pila
+				PUSH(r2) ;Carga texto en pila
+				bsr	BuscaMax
+				POP(r2) 
+				POP(r3) 
+				POP(r12)
+				
+				or r27,r0,0 ;Limpia r27
+				add r27,r0,1 ;Valor para contadores
+				or r28,r0,0 ;Limpia r28
+				or r28,r29,r0 ;Guarda longitud de cadena en r28
+				or r29,r0,0 ;Limpia r29
+				br CONTC1 ;Salta para continuar
+					
+	CONTC3:		ld r14,r31,12 ;Zona comprimida
+				or r20,r0,0 ;Limpia r20
+				add r20,r14,5 ;Puntero mapa de bits
+				st.b r7,r20,r4 ;Guarda Byte local en zona comprimida
+				add r4,r4,r27 ;Offset MB + 1;
+				br GUARDCB				
+				
+	CONTC1:		ld r3,r31,-4 ;Carga offset texto local de la pila
+				ld r4,r31,-8 ;Carga offset MB local de la pila
+				ld r5,r31,-12 ;Carga offset VL local de la pila
+				ld r6,r31,-20 ;Carga bit Byte MB local de la pila
+				ld r7,r31,-24 ;Carga Byte local MB local de la pila
+				cmp	r10,r28,4 ;Longitud < 4
+				bb1 lo,r10,MENOR4 ;Si es menor, hemos terminado
+				
+				ld	r13,r31,-16 ;Posición donde está repetición máxima
+				or	r8,r30,0 ;puntero VL
+				ld	r2,r31,8 ;Texto
+				st.b r13,r8,r5 ;Guarda offset bajo de Posicion VL
+				add r5,r5,r27 ;offset VL + 1
+				divu r13,r13,256 ;Siguiente byte de Posicion
+				st.b r13,r8,r5 ;Guarda offset alto de Posicion VL
+				add r5,r5,r27 ;offset VL + 1
+				st.b r28,r8,r5 ;Guarda Longitud en VL
+				add r5,r5,r27 ;offset VL + 1
+				add r3,r3,r28 ;Suma Longitud offset texto
+				br ESTUBIT7
+				
+	MENOR4:		or r8,r30,0 ;Puntero VL
+				ld r2,r31,8 ;Texto
+				ld.b r11,r2,r3 ;Carácter texto
+				st.b r11,r8,r5 ;Guarda carácter en VL
+				add r3,r3,r27 ;offset texto + 1
+				add r5,r5,r27 ;offset VL + 1
+				cmp	r10,r6,0 ;bit Byte == 0
+				bb1 eq,r10,COPIACZC ;Si cumple, guarda Byte local a zona comprimida
+				
+				br RECORCC
+				
+	COPIACZC:	ld r14,r31,12 ;	Zona comprimida
+				add r20,r14,5 ;Puntero mapa de bits
+				st.b r7,r20,r4 ;Guarda Byte local en zona comprimida
+				add r4,r4,r27 ;offset MB + 1
+				add r6,r0,7 ;bit Byte MB
+				or	r7,r0,0 ;Byte local MB
+				br	RECORC ;Vuelve para escoger el siguiente Byte
+				
+	ESTUBIT7:	cmp r10,r6,r26 ;bit Byte == 7
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT6 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,128 ;Iguala bit7 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT6: 	cmp r10,r6,r26 ;bit Byte == 6
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT5 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,64 ;Iguala bit6 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT5:	cmp r10,r6,r26 ;bit Byte == 5
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT4 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,32 ;Iguala bit5 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT4:	cmp r10,r6,r26 ;bit Byte == 4
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT3 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,16 ;Iguala bit4 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT3:	cmp r10,r6,r26 ;bit Byte == 3
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT2 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,8 ;Iguala bit3 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT2:	cmp r10,r6,r26 ;bit Byte == 2
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBIT1 ;Si no son iguales, comprueba si estamos en bit inferior
+				
+				or r7,r7,4 ;Iguala bit2 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBIT1:	cmp r10,r6,r26 ;bit Byte == 1
+				sub r26,r26,r27 ;Resta 1 al bit
+				bb1 ne,r10,ESTUBITF
+				
+				or r7,r7,2 ;Iguala bit1 a 1
+				sub r6,r6,r27 ;bit Byte local MB - 1
+				br RECORC
+				
+	ESTUBITF:	or r7,r7,r27 ;Iguala bit0 a 1
+				br COPIACZC
+		
+	GUARDCB:	st.b r3,r14,0 ;guarda byte bajo de offset texto en zona comprimida pos 0
+				divu r15,r3,256 ;Byte offset de texto
+				st.b r15,r14,r27 ;Guarda byte alto en zona comprimida pos 1
+				or r16,r0,0 ;Limpieza r16
+				add r16,r0,r27 ;Inicializa r16 a 1
+				st.b r16,r14,2 ;Guarda 1 en zona comprimida pos 2
+				add r17,r4,5; tamaño total cabecera=tamaño mapa de bits en bytes + 5
+				st.b r17,r14,3 ;Guarda tamaño cabecera en zona comprimida pos 3
+				divu r18,r17,256 ;Byte tamaño cabecera
+				st.b r18,r14,4 ;Guarda Byte alto en zona comprimida pos 4
+				or r29,r0,0 ;Limpia r29
+				add r29,r17,r5 ;Guarda en r29 tamaño total estructura (tamaño cabecera + offset VL)
+				or r19,r0,0 ;Limpia r19
+				add r19,r20,r4 ;Puntero a zona comprimida tras cabecera y mapa de bits
+				
+	COMPBUCF:	cmp r10,r5,0 ;offset VL == 0
+				bb1	ne,r10,BUCCF ;Si no son iguales, no se ha terminado de copiar a zona comprimida
+				
+				or r30,r31,0 
+				POP(r31)
+				POP(r1)
+				jmp(r1)	
+				
+	BUCCF:		ld.b r7,r8,0 ;carácter offset VL
+				st.b r7,r19,0 ;Guarda en zona comprimida
+				add r8,r8,r27 ;Puntero VL + 1
+				add r19,r19,r27 ;Puntero zona comprimida + 1
+				sub r5,r5,r27 ;Offset VL - 1
+				br	COMPBUCF ;Salta para comprobar si se ha terminado de copiar a zona comprimida
+
+
+
+Descomprime: 	ld r2,r30,0 ;Dirección Com
+				ld r3,r30,4 ;Dirección Desc
+				sub r30,r30,32 ;Reserva 8 palabras de espacio en pila
+				or r4,r0,0 ;Puntero Com
+				or r5,r0,0 ;Puntero Desc
+				or r6,r0,0 ;Byte dirección
+				or r7,r0,0 ;Limpieza r7
+				or r27,r0,0 ;Limpia r27
+				add r27,r27,1 ;Valor para contadores
+				add r7,r2,5 ;Puntero Mapa bits
+				or r8,r0,0 ;Limpieza r8
+				add r8,r0,128 ;Puntero Var tmp Mb
+				or r11,r0,0 ;Desplazamiento mb
+				or r12,r0,0 ;Limpieza r12
+				add r12,r2,3 ;Longitud cabecera com
+				or r13,r0,0 ;Limpieza r13
+				ld.b r13,r12,r0 ;Primer Byte
+				ld.b r6,r7,r11 ;Byte de dirección (Mb + desplazamiento)
+				add r12,r12,r27 ;Direccion txt + 1
+				or r14,r0,0 ;Limpieza r14
+				ld.b r14,r12,r0 ;Segundo Byte
+				add r12,r12,r27 ;Direccion txt + 1
+				or r13,r13,r14 ;Permite coger direccion del texto bit a bit
+				add r13,r2,r13 ;Dirección texto comprimido
+				sub r14,r13,r7 ;Bytes espacio mb (Dirección Txt - Dirección Mapa bits)
+				or r15,r0,0 ;Limpieza r15
+				
+	BUCD8: 		ld.b r15,r13,r4 ;Carácter texto[Puntero Desc]
+				st.b r15,r3,r5 ;Guarda carácter donde apunta puntero Desc
+				add r4,r4,r27 ;Puntero com + 1
+				add r5,r5,r27 ;Puntero Desc + 1
+				cmp r10,r5,8 ;Puntero Desc == 8
+				bb1 ne,r10,BUCD8 ;Si no lo es, vuelve al bucle hasta escoger los 8 primeros bits
+				
+	BUCDP:		cmp r10,r11,r14 ;Desplazamiento mb == Numero en mapa bits
+				bb1 ne,r10,CONTD1 ;Si no, continua para avanzar en el mapa
+				
+				or r26,r0,0 ;Limpia r26
+				st.b r26,r3,r5 ;Introduce 0 a final de cadena
+				ld.h r29,r2,r0 ;Guarda en r29 longitud de texto sin comprimir
+				add r30,r30,32 ;Restaura puntero de pila
+				jmp(r1)
+		
+	CONTD1:		or r16,r0,0 ;Limpieza r16
+				and r16,r6,r8 ;Comparador: Byte Dirección con Puntero Var
+				cmp r10,r16,r0 ;Comparador == 0
+				bb1 ne,r10,COPDCAR ;Si no, copia carácteres
+	
+				or r18,r0,0 ;Limpieza r18
+				ld.b r18,r13,r4 ;Carácter texto
+				st.b r18,r3,r5 ;Guarda carácter donde apunta puntero Desc
+				add r4,r4,r27 ;Puntero com + 1
+				add r5,r5,r27 ;Puntero Desc + 1
+				divu r8,r8,2 ;Avanzo al siguiente bit
+
+				cmp r10,r8,0 ;bitN == 0
+				bb1 ne,r10,BUCDP ;Si bit a estudiar no es 0, hay mas bits a estudiar
+				add r11,r11,r27 ;Desplazamiento + 1
+				or r8,r0,0 ;Limpia r8
+				add r8,r0,128 ;Apunta a bit7
+				ld.b r6,r7,r11 ;Siguiente Byte a estudiar
+				br BUCDP ;Salta para comprobar si ha terminado de recorrer mapa de bits 
+
+	COPDCAR:	ld.b r17,r13,r4 ;Salvaguarda dirección real de caracter a estudiar
+				add r4,r4,r27 ;Puntero com + 1
+				ld.b r16,r13,r4 ;Carácter texto Avanzado
+				add r4,r4,r27 ;Puntero com + 1
+				ld.b r18,r13,r4 ;Carácter texto 
+				add r4,r4,r27 ;Puntero com + 1
+				or r16,r16,r18 ;Longitud de caracteres copiados
+				or r19,r0,0 ;Limpia r19
+
+	BUCD1:		cmp r10,r19,r16 ;Longitud caracteres copiados == número caracteres a copiar
+				bb1 ne,r10,CONTD2 ;Si no son iguales, continua para avanzar
+				
+				or r20,r0,0 ;Limpia r20
+				divu r20,r8,2 ;Avanza siguiente bit a estudiar
+				or r8,r0,0 ;Limpia r8
+				add r8,r20,0 ;Introduce bit a estudiar de nuevo en r8
+				cmp r10,r20,0 ;bitN == 0
+				bb1 ne,r10,BUCDP ;Si bit a estudiar no es 0, hay mas bits a estudiar
+				
+				add r11,r11,r27 ;Desplazamiento + 1
+				ld.b r6,r7,r11 ;Siguiente Byte a estudiar
+				br BUCDP ;Salta para comprobar si ha terminado de recorrer mapa de bits 
+				
+	CONTD2:		ld.b r18,r3,r17 ;Carácter Texto
+				st.b r18,r3,r5 ;Introduce carácter en dirección desc
+				add r19,r19,r27 ;Caracateres a copiar + 1
+				add r17,r17,r27 ;Puntero caracteres + 1
+				add r5,r5,r27 ;Puntero desc + 1
+				br BUCD1 ;Salta para comprobar si ha terminado de copir caracteres	
+				
+				
+				
+Verifica:		PUSH(r1)
+				PUSH(r31)
+				or r31,r30,r30
+				or r2,r0,0 ;Limpieza r2
+				ld r2,r31,8 ;Dirección de texto
+				
+				PUSH(r2) ;Carga dirección de pila en texto
+				bsr LongCad
+				POP(r2)
+				
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para contadores
+				ld r2,r31,8 ;Carga de nuevo dirección texto
+				or r3,r0,0 ;Limpieza r3
+				ld r3,r31,12 ;Dirección Long1
+				or r4,r0,0 ;Limpieza r4
+				add r4,r29,0 ; Longitud texto original
+				st r4,r3,0 ;Guarda longitud texto en dirección Long1
+				or r5,r0,0 ;Limpieza r5
+				ld r5,r31,16 ; Dirección Long2
+				or r6,r0,0 ;Limpieza r6
+				add r6,r4,5 ;longitud texto + cabecera
+				add r3,r4,7 ;(Espacio mb + 7)
+				divu r3,r3,8 ;((Espacio mb + 7) / 8)
+				sub r3,r3,r27 ;(((Espacio mb + 7) / 8) - 1)
+				add r6,r6,r3 ;Espacio total necesario para LongCom (longitud texto + cabecera + ((Espacio mb + 7) / 8) - 1)
+				divu r6,r6,4 ;Espacio Longcom / 4
+				add r6,r6,r27 ;(Espacio Longcom / 4) + 1
+				mulu r6,r6,4 ;((Espacio Longcom / 4) + 1) * 4 -----> Espacio Longcom está ya en módulo 4
+				sub r30,r30,r6 ;Reserva espacio para longcom
+				or r7,r30,r30 ;Dirección PilaCom
+				or r9,r0,r0 ;Limpieza r9
+				divu r9,r4,4 ;Longitud texto / 4
+				add r9,r9,r27 ;(Longitud texto / 4) + 1
+				mulu r9,r9,4 ;((Longitud texto / 4) + 1) * 4 -----> Longitud texto está ya en módulo 4
+				sub r30,r30,r9 ;Reserva espacio para texto
+				or r8,r30,r30 ;Dirección PilaDes
+				or r21,r0,0 ;Limpieza r21
+				add r21,r0,r27 ;puntero = 1
+				sub r30,r30,24 ;Reserva espacio para variables
+				br VERSTORE
+				
+	VERCONS1:	PUSH(r7) ;Carga dirección PilaCom en pila
+				PUSH(r2) ;Carga dirección texto
+				bsr Comprime
+				POP(r2)
+				POP(r7)
+				
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para contadores
+				or r21,r0,0 ;Limpieza r21
+				add r21,r0,r27 ;puntero = 1
+				br VERLOAD
+				
+	VERCONL1:	or r21,r0,0 ;Limpieza r21
+				add r21,r0,2 ;puntero = 2
+				br VERSTORE
+				
+	VERCONS2:	PUSH(r8) ;Carga PilaDesc en pila
+				PUSH(r7) ;Carga PilaCom en pila
+				bsr Descomprime
+				POP(r7)
+				POP(r8)
+				
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para contadores
+				or r21,r0,0 ;Limpieza r21
+				add r21,r0,2 ;puntero = 2
+				br VERLOAD
+				
+	VERCONL2:	or r21,r0,0 ;Limpieza r21
+				add r21,r0,3 ;puntero = 3				
+				br VERSTORE
+
+	VERCONS3:	PUSH(r8) ;Carga PilaDesc en pila
+				bsr LongCad
+				POP(r8)
+				
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para contadores
+				or r21,r0,0 ;Limpieza r21
+				add r21,r0,3 ;puntero = 3	
+				st r29,r5,r0 ;Guarda longitud texto en Long2
+				br VERLOAD
+
+				
+	VERCONL3:	cmp r10,r29,r4 ;longitud PilaCom == longitud texto original
+				bb1 eq, r10,VERCONT1 ;Si son iguales, continua
+				addu r30,r30,24
+				or r29,r0,0 ;Limpieza r29
+				sub r29,r0,r27 ;r29 = -1
+				or r30,r31,r31
+				POP(r31)
+				POP(r1)
+				jmp(r1)
+				
+	VERCONT1:	or r21,r0,0 ;Limpieza r21
+				add r21,r0,4 ;puntero = 4
+				br VERSTORE
+	
+	VERCONS4:	PUSH(r8) ;Carga dirección PilaDes
+				PUSH(r2) ;Carga dirección texto
+				bsr CoincidenCad
+				POP(r2)
+				POP(r8)
+				
+				or r27,r0,0 ;Limpieza r27
+				add r27,r27,1 ;Valor para contadores
+				or r21,r0,0 ;Limpieza r21
+				add r21,r0,4 ;puntero = 4
+				br VERLOAD				
+				
+	VERCONL4:	or r22,r29,r0
+				cmp r10,r22,r4 ;Texto antes de comprimido == Texto despues de comprimido
+				bb1 eq,r10,VERCONT2 ;Si son iguales, continua
+				
+				addu r30,r30,24
+				or r29,r0,0 ;Limpia r29
+				sub r29,r0,2 ;r29 = -2
+				
+				or r30,r31,r31
+				POP(r31)
+				POP(r1)
+				jmp(r1)
+
+	VERCONT2:	addu r30,r30,24
+				or r29,r0,0 ;Limpia r29 (por tanto, r29 = 0)
+				
+				or r30,r31,r31
+				POP(r31)
+				POP(r1)
+				jmp(r1)
+	
+	
+	VERSTORE:	st r2,r30,0 ;Carga direccion texto en pila
+				st r4,r30,4 ;Carga longitud texto en pila
+				st r5,r30,8 ;Carga dirección long2 en pila
+				st r6,r30,12 ;Carga dirección PilaCom en pila
+				st r7,r30,16 ;Carga dirección PilaDes en pila
+				st r8,r30,20 ;Carga longitud texto en modulo 4 en pila
+				cmp r10,r21,1 ;puntero == 1
+				bb1 eq,r10,VERCONS1
+				cmp r10,r21,2 ;puntero == 2
+				bb1 eq,r10,VERCONS2
+				cmp r10,r21,3 ;puntero == 3
+				bb1 eq,r10,VERCONS3
+				br VERCONS4 ;salta por puntero == 4
+				
+	VERLOAD:	ld r2,r30,0 ;Carga direccion texto en pila
+				ld r4,r30,4 ;Carga longitud texto en pila
+				ld r5,r30,8 ;Carga dirección long2 en pila
+				ld r6,r30,12 ;Carga dirección PilaCom en pila
+				ld r7,r30,16 ;Carga dirección PilaDes en pila
+				ld r8,r30,20 ;Carga longitud texto en modulo 4 en pila
+				cmp r10,r21,1 ;puntero == 1
+				bb1 eq,r10,VERCONL1
+				cmp r10,r21,2 ;puntero == 2
+				bb1 eq,r10,VERCONL2
+				cmp r10,r21,3 ;puntero == 3
+				bb1 eq,r10,VERCONL3
+				br VERCONL4 ;salta por puntero == 4
+;
+; Debe incorporar este fichero con TODAS sus líneas, sin modificar
+; ninguna de ellas, al final de su archivo CDV24.ens
+;
+; Este aviso se refiere también a las líneas de comentario
+; 
+;
+;; Grupo:    z170002 - Thu Oct 26 11:52:08 CEST 2023
+
+BuscaMax:
+				PUSH (r1)
+				PUSH (r31)
+				or   r31, r30, 0
+				or   r28, r0, 0x0
+				PUSH (r28)
+			
+				ld   r10, r31, 8;  REF
+				ld   r11, r31, 12; MAX
+				ld   r12, r31, 16; Dir(JJ)
+			
+				sub  r5, r0, 1		; guarda -1 en *JJ por si no se
+				st   r5, r12, 0		; encuentran coincidencias
+			
+				addu r27, r0, r0  ; P
+				addu r28, r0, r0  ; L
+
+	BucBM:
+				ld.bu r20, r10, r11	; C=REF(max)
+			
+							; Reserva registros que
+							; necesita conservar
+				PUSH (r28) 	    	; L
+				PUSH (r11)	    	; MAX
+			
+									; Parámetros de BuscaCar
+				PUSH (r27)	    	; P
+				PUSH (r10)	    	; REF
+				PUSH (r20)	   		; C
+				bsr  BuscaCar
+				POP  (r20)
+				POP  (r10)
+				POP  (r27)
+			
+				POP  (r11)			; Recupera registros
+				POP  (r28)	        ; salvaguardados
+			
+				cmp  r5, r29, r11	; nuevo P es >= MAX ??
+				bb1  hs, r5, finBM
+				addu r27, r29, r0	; P = nuevo P
+				
+				addu r13, r10, r27	; *REF(P)
+				addu r14, r10, r11 	; *REF(max)	
+			
+				PUSH (r11)     		; Reserva registros que
+				PUSH (r10)			; necesita conservar
+				PUSH (r28)
+				PUSH (r27)
+				
+				PUSH (r14)			; Parámetros de CoincidenCad
+				PUSH (r13)
+				bsr  CoincidenCad
+				POP  (r13)
+				POP  (r14)
+				
+				POP  (r27)			; Recupera registros
+				POP  (r28)			; salvaguardados
+				POP  (r10)
+				POP  (r11)
+			
+				cmp r5, r29, r28	; Comprueba si longitud > L
+				bb1 le, r5, contBM	; Si no lo es, continúa
+				cmp r5, r29, 255	; Comprueba si longitud > 255
+				bb1 le, r5, noLimBM	; Si no lo es, continúa
+				addu r29, r0, 255	; Si lo es, limita su valor a 255
+	
+	noLimBM:
+				addu r28, r29, r0	; actualiza L
+				ld   r12, r31, 16	; Dir(JJ)
+				st   r27, r12, r0	; actualiza P en *JJ
+				bb1 ge, r5, finBM	; Si coincidencia >= 255 termina
+	contBM: 
+				addu r27, r27, 1	; Pasa al siguiente carácter
+				cmp  r5, r27, r11	; Es P>=max ?
+				bb1  hs, r5, finBM
+	
+				br   BucBM   		; Nueva búsqueda del primer carácter
+
+	finBM:
+				addu r29, r28, r0	; asigna L al valor de retorno r29
+	  
+				or   r27, r0, 0x0
+				POP  (r28)
+
+				or   r30, r31, 0
+				POP  (r31)
+				POP  (r1)
+				jmp  (r1)
+				;; Grupo:    z170002

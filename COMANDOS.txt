@@ -1,0 +1,12 @@
+DIRECTORIO PROGRAMA:
+cd DirectorioDondeEstaTodo
+
+COMPILAR:
+88110e -ml -o probar.bin cdv24.ens
+
+EJECTUAR:
+mc88110 probar.bin
+	TODO: e
+	BUSCAR DIR MEM: V 0x00000 NCASILLASVISUALIZAR
+	EXIT: q
+	INST A INST= t
